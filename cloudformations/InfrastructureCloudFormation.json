@@ -1,0 +1,247 @@
+{
+  "AWSTemplateFormatVersion": "2010-09-09",
+  "Description": "Infrastructure of the CodeMatcher (Group-35).",
+  "Resources": {
+    "CodeMatcherUserPool": {
+      "Type": "AWS::Cognito::UserPool",
+      "Properties": {
+        "AliasAttributes": [],
+        "AutoVerifiedAttributes": ["email"],
+        "AccountRecoverySetting": {
+          "RecoveryMechanisms": [
+            {
+              "Name": "verified_email",
+              "Priority": 1
+            }
+          ]
+        },
+        "MfaConfiguration": "OFF",
+        "Policies": {
+          "PasswordPolicy": {
+            "MinimumLength": 8,
+            "RequireLowercase": true,
+            "RequireNumbers": true,
+            "RequireSymbols": false,
+            "RequireUppercase": false,
+            "TemporaryPasswordValidityDays": 7
+          }
+        },
+        "Schema": [
+          {
+            "Name": "email",
+            "AttributeDataType": "String",
+            "Mutable": false,
+            "Required": true
+          }
+        ],
+        "UsernameConfiguration": {
+          "CaseSensitive": false
+        },
+        "VerificationMessageTemplate": {
+          "DefaultEmailOption": "CONFIRM_WITH_LINK"
+        },
+        "UserPoolName": "codematcher-cf4"
+      }
+    },
+    "ClientOfUserPool": {
+      "Type": "AWS::Cognito::UserPoolClient",
+      "Properties": {
+        "UserPoolId": {
+          "Ref": "CodeMatcherUserPool"
+        },
+        "GenerateSecret": false,
+        "CallbackURLs": ["http://localhost:5000/"],
+        "LogoutURLs": ["http://localhost:5000/"]
+      }
+    },
+    "DomainOfUserPool": {
+      "Type": "AWS::Cognito::UserPoolDomain",
+      "Properties": {
+        "Domain": "codemathg35cf4",
+        "UserPoolId": {
+          "Ref": "CodeMatcherUserPool"
+        }
+      }
+    },
+
+    "MyInstanceProfile": {
+      "Type": "AWS::IAM::InstanceProfile",
+      "Properties": {
+        "Roles": ["LabRole"]
+      }
+    },
+
+    "CodeMatcherCloudFront": {
+      "Type": "AWS::CloudFront::Distribution",
+      "Properties": {
+        "DistributionConfig": {
+          "Origins": [
+            {
+              "DomainName": "g35frontend.s3.us-east-1.amazonaws.com",
+              "Id": "g35frontend",
+              "S3OriginConfig": {
+                "OriginAccessIdentity": ""
+              }
+            }
+          ],
+          "DefaultCacheBehavior": {
+            "AllowedMethods": [
+              "GET",
+              "HEAD",
+              "OPTIONS",
+              "PUT",
+              "PATCH",
+              "POST",
+              "DELETE"
+            ],
+            "CachePolicyId": "658327ea-f89d-4fab-a63d-7e88639e58f6",
+            "Compress": true,
+            "TargetOriginId": "g35frontend",
+            "ViewerProtocolPolicy": "allow-all"
+          },
+          "CacheBehaviors": [
+            {
+              "AllowedMethods": [
+                "GET",
+                "HEAD",
+                "OPTIONS",
+                "PUT",
+                "PATCH",
+                "POST",
+                "DELETE"
+              ],
+              "CachePolicyId": "658327ea-f89d-4fab-a63d-7e88639e58f6",
+              "PathPattern": "*",
+              "Compress": true,
+              "MaxTTL": 31536000,
+              "MinTTL": 1,
+              "TargetOriginId": "g35frontend",
+              "ViewerProtocolPolicy": "allow-all"
+            }
+          ],
+          "Comment": "This distribution is for g35-codematcher.",
+          "CustomErrorResponses": [
+            {
+              "ErrorCode": 403,
+              "ResponseCode": 200,
+              "ResponsePagePath": "/index.html"
+            },
+            {
+              "ErrorCode": 404,
+              "ResponseCode": 200,
+              "ResponsePagePath": "/index.html"
+            }
+          ],
+          "DefaultRootObject": "index.html",
+          "Enabled": true,
+          "HttpVersion": "http1.1"
+        }
+      }
+    },
+
+    "CodeMatcherEBSEnv": {
+      "Type": "AWS::ElasticBeanstalk::Environment",
+      "Properties": {
+        "ApplicationName": "g35",
+        "Description": "The backend of the codematcher application will hosted on this AWS ElasticBeanstalk environment.",
+        "EnvironmentName": "G35-env-cf4",
+        "OperationsRole": "arn:aws:iam::404283073288:role/LabRole",
+        "OptionSettings": [
+          {
+            "Namespace": "aws:elasticbeanstalk:environment",
+            "OptionName": "EnvironmentType",
+            "Value": "LoadBalanced"
+          },
+          {
+            "Namespace": "aws:autoscaling:launchconfiguration",
+            "OptionName": "IamInstanceProfile",
+            "Value": {
+              "Ref": "MyInstanceProfile"
+            }
+          }
+        ],
+
+        "SolutionStackName": "64bit Amazon Linux 2 v5.5.4 running Node.js 16",
+        "VersionLabel": "Sample Application-3"
+      }
+    },
+
+    "UserData": {
+      "Type": "AWS::Lambda::Function",
+      "Properties": {
+        "FunctionName": "userData_cf_3",
+        "Handler": "userData/index.handler",
+        "Role": "arn:aws:iam::404283073288:role/LabRole",
+        "Code": {
+          "S3Bucket": "cflambdag35",
+          "S3Key": "userData.zip"
+        },
+        "Runtime": "nodejs16.x",
+        "Timeout": 3,
+        "MemorySize": 128
+      }
+    },
+    "UserLike": {
+      "Type": "AWS::Lambda::Function",
+      "Properties": {
+        "FunctionName": "userLike_cf_3",
+        "Handler": "userLike/index.handler",
+        "Role": "arn:aws:iam::404283073288:role/LabRole",
+        "Code": {
+          "S3Bucket": "cflambdag35",
+          "S3Key": "userLike.zip"
+        },
+        "Runtime": "nodejs16.x",
+        "Timeout": 3,
+        "MemorySize": 128
+      }
+    },
+    "SubscriberFunction": {
+      "Type": "AWS::Lambda::Function",
+      "Properties": {
+        "FunctionName": "subscriberFunction_cf_3",
+        "Handler": "subscriberFunction/index.handler",
+        "Role": "arn:aws:iam::404283073288:role/LabRole",
+        "Code": {
+          "S3Bucket": "cflambdag35",
+          "S3Key": "subscriberFunction.zip"
+        },
+        "Runtime": "nodejs16.x",
+        "Timeout": 3,
+        "MemorySize": 128
+      },
+      "DependsOn": "MatchSnsTopic"
+    },
+    "PublisherFunction": {
+      "Type": "AWS::Lambda::Function",
+      "Properties": {
+        "FunctionName": "publisherFunction_cf_3",
+        "Handler": "publisherFunction/index.handler",
+        "Role": "arn:aws:iam::404283073288:role/LabRole",
+        "Code": {
+          "S3Bucket": "cflambdag35",
+          "S3Key": "publisherFunction.zip"
+        },
+        "Runtime": "nodejs16.x",
+        "Timeout": 3,
+        "MemorySize": 128
+      },
+      "DependsOn": "MatchSnsTopic"
+    },
+
+    "MatchSnsTopic": {
+      "Type": "AWS::SNS::Topic",
+      "Properties": {
+        "DisplayName": "codematcher",
+        "FifoTopic": false,
+        "Subscription": [
+          {
+            "Endpoint": "kishansavaliya1999@gmail.com",
+            "Protocol": "email"
+          }
+        ],
+        "TopicName": "matchcf4"
+      }
+    }
+  }
+}
